@@ -33,7 +33,7 @@ PS C:\> Invoke-SIDGuess -HostName 192.168.1.34 -HostPort 1521 -SID EPROD
 .EXAMPLE
 PS C:\> Invoke-SIDGuess  -HostList oracle_hosts.txt -Port 1521 -SIDList sidwordlist.txt
 
-.REFERENCE
+.LINK
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
 https://technet.microsoft.com/en-us/library/hh849914.aspx
 
@@ -148,7 +148,7 @@ PS C:\> Invoke-CredentialGuess -HostName 192.168.1.34 -HostPort 1521 -SID EPROD 
 .EXAMPLE
 PS C:\> Invoke-CredentialGuess -HostName 192.168.1.34 -Port 1521 -SID EPROD -UsernameList users.txt -PasswordList passwords.txt
 
-.REFERENCES
+.LINK
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
 https://technet.microsoft.com/en-us/library/hh849914.aspx
 
@@ -258,7 +258,7 @@ Query to execute on the remote Oracle DB.
 .EXAMPLE
 PS C:\> Oracle-QueryExec  -Host 192.168.1.34 -Port 1521 -Sid EPROD -User SCOTT -Password TIGER -QueryString "SELECT * FROM TABLE"
 
-.REFERENCES
+.LINK
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
 https://technet.microsoft.com/en-us/library/hh849914.aspx
 #>
