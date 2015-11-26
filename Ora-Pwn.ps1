@@ -44,7 +44,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         Param(
         [Parameter(Mandatory = $false)]
         [string]$HostName,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [string]$HostList,
         [Parameter(Mandatory = $True)]
         [string]$HostPort,   
@@ -165,9 +165,9 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [string]$SID,
         [Parameter(Mandatory = $false)]
         [string]$Username,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [string]$UsernameList,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [string]$Password,
         [Parameter(Mandatory = $false)]
         [string]$PasswordList
