@@ -256,7 +256,7 @@ Password to authenticate agains the remote Oracle DB.
 Query to execute on the remote Oracle DB.
 
 .EXAMPLE
-PS C:\> Oracle-QueryExec  -Hostname 192.168.1.34 -HostPort 1521 -SID EPROD -Username SCOTT -Password TIGER -QueryString "SELECT * FROM TABLE"
+PS C:\> Invoke-QueryExec  -Hostname 192.168.1.34 -HostPort 1521 -SID EPROD -Username SCOTT -Password TIGER -QueryString "SELECT * FROM TABLE"
 
 .LINK
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
