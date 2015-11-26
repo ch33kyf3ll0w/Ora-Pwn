@@ -33,7 +33,7 @@ PS C:\> Invoke-SIDGuess -HostName 192.168.1.34 -HostPort 1521 -SID EPROD
 .EXAMPLE
 PS C:\> Invoke-SIDGuess  -HostList oracle_hosts.txt -Port 1521 -SIDList sidwordlist.txt
 
-.REFERENCES
+.REFERENCE
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
 https://technet.microsoft.com/en-us/library/hh849914.aspx
 
