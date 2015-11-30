@@ -1,5 +1,5 @@
 # Ora-Pwn
-An Oracle attack tool written in PowerShell and using the .NET OracleClient Namespace. Can be used to bruteforce SIDs, User Credentials, and to execute queries.
+An Oracle attack tool written in PowerShell and using the .NET OracleClient Namespace. Can be used to bruteforce SIDs, user credentials, and to execute queries.
 
 
 ## Current Functions:
