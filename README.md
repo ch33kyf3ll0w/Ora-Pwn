@@ -10,8 +10,8 @@ An Oracle attack tool written in PowerShell and using the .NET OracleClient Name
 
 ## Future Additions:
     Functions:
-    Invoke-QueryExec            -   Executes and returns output for provided querys
-    Invoke-UNCInject-DS         -   Leverages ctxsys.context to inject a UNC filepath
+    Invoke-UNCINject-TNS        -   Injects UNC path into log_path
+    Invoke-InjectShell          -   Creates a reverse shell.
     
     General:
     Improved Error handling
