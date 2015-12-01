@@ -2,6 +2,7 @@
 .SYNOPSIS
 
 Author: Andrew Bonstrom (@ch33kyf3ll0w)
+Version: 1.0
 
 .DESCRIPTION
 An Oracle attack tool written in PowerShell and using the .NET OracleClient. Can be used to bruteforce SIDs, Username/Passwords, and to execute queries.
