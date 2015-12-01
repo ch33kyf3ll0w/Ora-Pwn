@@ -314,7 +314,7 @@ function Invoke-UNCInject-DS {
 
 <#
 .DESCRIPTION
-Leverages the creation of indexes by ctxsys.context to force the underlying user account running the  
+Leverages the creation of indexes by ctxsys.context to force an NTLM authentication attempt against a specified host.
 
 .PARAMETER HostName
 Host of the remote TNS Listener.
