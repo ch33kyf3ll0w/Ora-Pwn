@@ -10,7 +10,7 @@ An Oracle attack tool written in PowerShell and using the .NET OracleClient Name
 
 ## Future Additions:
     Functions:
-    Invoke-UNCINject-TNS        -   Injects UNC path into log_path
+    Invoke-UNCInject-TNS        -   Injects UNC path into log_path
     Invoke-InjectShell          -   Creates a reverse shell.
     
     General:
