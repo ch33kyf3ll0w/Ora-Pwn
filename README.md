@@ -14,6 +14,4 @@ v1.1 - Now supports Muli-threading!
     Functions:
     Invoke-UNCInject-TNS        -   Injects UNC path into log_path portion of the TNS connection string
     Invoke-InjectShell          -   Creates a reverse shell.
-    
-    General:
-    Spooling functionality
+
