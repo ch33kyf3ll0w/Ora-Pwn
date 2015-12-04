@@ -1,6 +1,8 @@
 # Ora-Pwn
 An Oracle attack tool written in PowerShell and using the .NET OracleClient Namespace. Can be used to bruteforce SIDs, user credentials, and to execute queries.
 
+v1.1 - Now supports Muli-threading!
+
 
 ## Current Functions:
     Invoke-SIDGuess             -   Checks to see if provided SIDs are valid.
@@ -16,4 +18,3 @@ An Oracle attack tool written in PowerShell and using the .NET OracleClient Name
     General:
     Improved Error handling
     Spooling functionality
-    Threading 
