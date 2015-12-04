@@ -16,5 +16,4 @@ v1.1 - Now supports Muli-threading!
     Invoke-InjectShell          -   Creates a reverse shell.
     
     General:
-    Improved Error handling
     Spooling functionality
