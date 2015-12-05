@@ -112,10 +112,10 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 				$ErrorMessage = $_.Exception.Message
 				#01017 is the ORA exception that implies failed username/password. Cannot get to this phase without valid SID, therefore the existence of 01017 implies correct SID
 				if ($ErrorMessage -match "01017"){
-					Write-Host -Object "`n[+] $s for the TNS listener at $ComputerName is valid!`n" -ForegroundColor 'green'
+					Write-Host -Object "[+] $s for the TNS listener at $ComputerName is valid!" -ForegroundColor 'green'
 				}
 				else{
-					Write-Host  -Object "`n[-] $s is invalid for the TNS listener at $ComputerName.`n" -ForegroundColor 'red'
+					Write-Host  -Object "[-] $s is invalid for the TNS listener at $ComputerName." -ForegroundColor 'red'
 				}
         
 				#Close connection
@@ -130,11 +130,6 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
                 'HostPort' = $HostPort
                 'sidWordList' = $sidWordList
             }
-
-            # kick off the threaded script block + arguments 
-            Invoke-ThreadedFunction -ComputerName $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
-
-			
 #########################################################################################################################
 #
 # Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
@@ -279,7 +274,10 @@ function Invoke-ThreadedFunction {
         $Pool.Dispose()
         Write-Verbose "All threads completed!"
     }
-}						
+}
+        # kick off the threaded script block + arguments 
+        Invoke-ThreadedFunction -ComputerName $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
+
 }
 
 function Invoke-CredentialGuess {
@@ -382,7 +380,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 				try
 				{
 					$conn.Open()
-					Write-Host  -Object "`n[+] The provided Username $UserName and Password $p were correct!`n" -ForegroundColor 'green'
+					Write-Host  -Object "[+] The provided Username $UserName and Password $p were correct!" -ForegroundColor 'green'
 				}
 				catch
 				{
@@ -390,13 +388,13 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 					$ErrorMessage = $_.Exception.Message
 					#01017 is the ORA exception that implies failed username/password. 
 					if ($ErrorMessage -match "01017"){
-						Write-Host  -Object "`n[-] The provided Username $UserName and Password $p were incorrect!`n" -ForegroundColor 'red'
+						Write-Host  -Object "[-] The provided Username $UserName and Password $p were incorrect!" -ForegroundColor 'red'
 					}
 					elseif ($ErrorMessage -match "28000"){
-						Write-Host  -Object "`n[*] The provided Username $UserName has a status of Locked Out!`n" -ForegroundColor 'yellow'
+						Write-Host  -Object "[*] The provided Username $UserName has a status of Locked Out!" -ForegroundColor 'yellow'
 					}
 					else{
-						Write-Host  -Object "`n[*] Connection Failed. Error: $ErrorMessage`n" -ForegroundColor 'red'
+						Write-Host  -Object "[*] Connection Failed. Error: $ErrorMessage" -ForegroundColor 'red'
 					}			
 				}
 			$conn.Close()
@@ -410,9 +408,6 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 			'SID' = $SID
             'PasswordWordList' = $PasswordWordList
         }	
-		
-        # kick off the threaded script block + arguments 
-        Invoke-ThreadedFunction -UserName $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
 		
 #########################################################################################################################
 #
@@ -555,7 +550,8 @@ function Invoke-ThreadedFunction {
         Write-Verbose "All threads completed!"
     }
 }	
-	
+        # kick off the threaded script block + arguments 
+        Invoke-ThreadedFunction -UserName $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
 }
 
 function Invoke-QueryExec {
