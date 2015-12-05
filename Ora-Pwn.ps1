@@ -491,7 +491,7 @@ function Invoke-ThreadedFunction {
             $DebugPreference = 'Continue'
         }
 
-        Write-Verbose "[*] Total number of hosts: $($iterator.count)"
+        Write-Verbose "[*] Total number of items to iterate: $($iterator.count)"
 
 
         # Adapted from:
@@ -572,7 +572,7 @@ function Invoke-ThreadedFunction {
 
     end {
 
-        Write-Verbose "Waiting for scanning threads to finish..."
+        Write-Verbose "Waiting for threads to finish..."
 
         $WaitTimeout = Get-Date
 
