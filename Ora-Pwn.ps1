@@ -48,7 +48,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         Param(
         [Parameter(Mandatory = $false)]
         [string]$HostName,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [string]$HostList,
         [Parameter(Mandatory = $True)]
         [string]$HostPort,   
@@ -56,8 +56,8 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [string]$SID,
         [Parameter(Mandatory = $false)]
         [string]$SIDList,
-		[Parameter(Mandatory = $false)]
-		[Int]$Threads = 20
+	[Parameter(Mandatory = $false)]
+	[Int]$Threads = 20
 )
 
 		#Initialize Arrays
@@ -187,13 +187,13 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [string]$SID,
         [Parameter(Mandatory = $false)]
         [string]$Username,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [string]$UsernameList,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [string]$Password,
         [Parameter(Mandatory = $false)]
         [string]$PasswordList,
-		[Parameter(Mandatory = $false)]
+	[Parameter(Mandatory = $false)]
         [Int]$Threads = 20
 )
         #Loads .NET OracleClient Assembly
