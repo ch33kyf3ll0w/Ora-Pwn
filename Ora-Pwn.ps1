@@ -66,7 +66,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
 
 		
         #Loads .NET OracleClient Assembly
-	Add-Type -AssemblyName System.Data.OracleClient
+	Add-Type -AssemblyName System.Data.OracleClient| Out-Null
 
 	#Populate arrays with user provided data
 	if ($HostList){
@@ -193,7 +193,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
         [Int]$Threads = 20
 )
         #Loads .NET OracleClient Assembly
-	Add-Type -AssemblyName System.Data.OracleClient
+	Add-Type -AssemblyName System.Data.OracleClient| Out-Null
 		
 	#Initialize Arrays
 	$UsernameWordList = @()
@@ -312,7 +312,7 @@ https://technet.microsoft.com/en-us/library/hh849914.aspx
     	)
 		
 	#Loads .NET OracleClient Assembly
-	Add-Type -AssemblyName System.Data.OracleClient
+	Add-Type -AssemblyName System.Data.OracleClient| Out-Null
 
 	#Create connection string
 	$connectionString = "Data Source=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(Host=$HostName)(Port=$HostPort)))(CONNECT_DATA=(SID=$SID)));User id=$Username;Password=$Password"
@@ -403,7 +403,7 @@ http://dbatricksworld.com/ora-65096-invalid-common-user-or-role-name-and-ora-650
     	)
 		
 	#Loads .NET OracleClient Assembly
-	Add-Type -AssemblyName System.Data.OracleClient
+	Add-Type -AssemblyName System.Data.OracleClient| Out-Null
 	
 	#Generate random string
 	$randStr1 = ([char[]]([char]'a'..[char]'z' + [char]'A'..[char]'Z') | sort {get-random})[0..12] -join ''
